@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(start \"\" \"C:\\\\Users\\\\Home\\\\Documents\\\\Claude-projets\\\\analyse-vehicule.html\")"
+    ]
+  }
+}

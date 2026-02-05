@@ -627,6 +627,9 @@ Vous n'avez pas besoin de trier ou reformuler."></textarea>
     </div>
 
     <script>
+        // Configuration - URL du backend (à modifier après déploiement)
+        const API_URL = 'https://analyse-vehicule-production.up.railway.app/api/analyze';
+
         // Stockage des fichiers
         const fileStorage = {
             documents: [],
@@ -641,7 +644,6 @@ Vous n'avez pas besoin de trier ou reformuler."></textarea>
             const list = document.getElementById(listId);
             const storageKey = input.name;
 
-            // Ajouter les nouveaux fichiers au stockage
             for (const file of input.files) {
                 fileStorage[storageKey].push(file);
             }
@@ -669,124 +671,129 @@ Vous n'avez pas besoin de trier ou reformuler."></textarea>
             renderFileList(listId, storageKey);
         }
 
-        function handleSubmit(event) {
+        async function handleSubmit(event) {
             event.preventDefault();
 
             const form = event.target;
             const description = form.description.value.trim();
             const annonceLink = form.annonceLink.value.trim();
-            const hasDocuments = fileStorage.documents.length > 0;
-            const hasPhotos = fileStorage.photos.length > 0;
-
-            // Vérification des données minimales
-            const hasExploitableData = description.length > 20 || hasDocuments || hasPhotos || annonceLink.length > 10;
 
             // Afficher le chargement
             document.getElementById('page-form').classList.add('hidden');
             document.getElementById('page-loading').classList.remove('hidden');
 
-            // Simuler un délai d'analyse
-            setTimeout(() => {
+            try {
+                // Construire le FormData
+                const formData = new FormData();
+                formData.append('description', description);
+                formData.append('annonceLink', annonceLink);
+
+                // Ajouter les fichiers
+                fileStorage.documents.forEach(file => {
+                    formData.append('documents', file);
+                });
+                fileStorage.photos.forEach(file => {
+                    formData.append('photos', file);
+                });
+
+                // Appel API
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
                 document.getElementById('page-loading').classList.add('hidden');
 
-                if (!hasExploitableData) {
-                    showInsufficientDataMessage();
+                if (result.erreur) {
+                    showErrorMessage(result.erreur);
                 } else {
-                    showMockResults({
-                        description,
-                        hasDocuments,
-                        hasPhotos,
-                        annonceLink
-                    });
+                    showResults(result);
                 }
 
                 document.getElementById('page-results').classList.remove('hidden');
                 window.scrollTo(0, 0);
-            }, 1500);
+
+            } catch (error) {
+                console.error('Erreur:', error);
+                document.getElementById('page-loading').classList.add('hidden');
+                showErrorMessage("Une erreur s'est produite lors de l'analyse. Veuillez réessayer.");
+                document.getElementById('page-results').classList.remove('hidden');
+                window.scrollTo(0, 0);
+            }
         }
 
-        function showInsufficientDataMessage() {
+        function showErrorMessage(message) {
             const content = document.getElementById('results-content');
             content.innerHTML = `
                 <div class="error-message">
-                    <p>Les informations fournies sont insuffisantes pour produire une analyse factuelle utile.</p>
+                    <p>${message}</p>
                 </div>
             `;
         }
 
-        function showMockResults(data) {
+        function showResults(data) {
             const content = document.getElementById('results-content');
-
             let html = '';
 
             // 1. Éléments cohérents
-            html += `
-                <div class="result-section coherent">
-                    <h2><span class="indicator"></span>Éléments cohérents</h2>
-                    <ul>
-                        <li>Le kilométrage annoncé correspond à une utilisation normale pour ce type de véhicule.</li>
-                        <li>La description fournie par le vendeur est détaillée et mentionne l'historique d'entretien.</li>
-                        <li>Les photos montrent un état général conforme à la description textuelle.</li>
-                    </ul>
-                </div>
-            `;
-
-            // 2. Incohérences factuelles potentielles
-            html += `
-                <div class="result-section incoherent">
-                    <h2><span class="indicator"></span>Incohérences factuelles potentielles</h2>
-                    <ul>
-                        <li>Le vendeur indique "jamais accidenté", mais une photo montre une légère différence de teinte sur l'aile arrière droite, ce qui pourrait suggérer une reprise de peinture.</li>
-                        <li>L'annonce mentionne "première main", mais les échanges évoquent un achat effectué il y a 3 ans — le véhicule aurait donc au moins deux propriétaires.</li>
-                    </ul>
-                </div>
-            `;
-
-            // 3. Zones d'ombre
-            html += `
-                <div class="result-section missing">
-                    <h2><span class="indicator"></span>Zones d'ombre / informations manquantes</h2>
-                    <ul>
-            `;
-
-            if (!data.hasDocuments) {
-                html += `<li>Aucun document fourni (factures, contrôles techniques, carnet d'entretien).</li>`;
+            if (data.elementsCoherents && data.elementsCoherents.length > 0) {
+                html += `
+                    <div class="result-section coherent">
+                        <h2><span class="indicator"></span>Éléments cohérents</h2>
+                        <ul>
+                            ${data.elementsCoherents.map(item => `<li>${item}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
             }
 
-            html += `
-                        <li>Historique d'entretien entre 2018 et 2021 non documenté.</li>
-                        <li>Origine du véhicule (importation éventuelle) non précisée.</li>
-                        <li>Dernier contrôle technique non mentionné ou non fourni.</li>
-                    </ul>
-                </div>
-            `;
+            // 2. Incohérences potentielles
+            if (data.incoherencesPotentielles && data.incoherencesPotentielles.length > 0) {
+                html += `
+                    <div class="result-section incoherent">
+                        <h2><span class="indicator"></span>Incohérences factuelles potentielles</h2>
+                        <ul>
+                            ${data.incoherencesPotentielles.map(item => `<li>${item}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+
+            // 3. Zones d'ombre
+            if (data.zonesOmbre && data.zonesOmbre.length > 0) {
+                html += `
+                    <div class="result-section missing">
+                        <h2><span class="indicator"></span>Zones d'ombre / informations manquantes</h2>
+                        <ul>
+                            ${data.zonesOmbre.map(item => `<li>${item}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
 
             // 4. Questions à poser
-            html += `
-                <div class="result-section questions">
-                    <h2><span class="indicator"></span>Questions à poser / vérifications à faire</h2>
-                    <ul>
-                        <li>Pouvez-vous fournir le dernier contrôle technique et les éventuelles contre-visites ?</li>
-                        <li>L'aile arrière droite a-t-elle fait l'objet d'une intervention (reprise peinture, remplacement) ?</li>
-                        <li>Disposez-vous des factures d'entretien pour la période 2018-2021 ?</li>
-                        <li>Le véhicule a-t-il été importé ? Si oui, de quel pays et à quelle date ?</li>
-                        <li>Combien de propriétaires figurent sur la carte grise ?</li>
-                    </ul>
-                </div>
-            `;
+            if (data.questionsAPoser && data.questionsAPoser.length > 0) {
+                html += `
+                    <div class="result-section questions">
+                        <h2><span class="indicator"></span>Questions à poser / vérifications à faire</h2>
+                        <ul>
+                            ${data.questionsAPoser.map(item => `<li>${item}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
 
             // 5. Lecture globale
-            html += `
-                <div class="global-reading">
-                    <h2>Lecture globale</h2>
-                    <p>
-                        Les éléments fournis présentent une cohérence d'ensemble satisfaisante.
-                        Deux points méritent clarification avant d'aller plus loin : l'état de la carrosserie (aile arrière droite)
-                        et le nombre réel de propriétaires. L'absence de documents d'entretien limite la possibilité de vérifier
-                        l'historique mécanique annoncé.
-                    </p>
-                </div>
-            `;
+            if (data.lectureGlobale) {
+                html += `
+                    <div class="global-reading">
+                        <h2>Lecture globale</h2>
+                        <p>${data.lectureGlobale}</p>
+                    </div>
+                `;
+            }
 
             content.innerHTML = html;
         }
@@ -794,14 +801,12 @@ Vous n'avez pas besoin de trier ou reformuler."></textarea>
         function resetForm(event) {
             event.preventDefault();
 
-            // Réinitialiser le formulaire
             document.getElementById('analysis-form').reset();
             fileStorage.documents = [];
             fileStorage.photos = [];
             document.getElementById('documents-list').innerHTML = '';
             document.getElementById('photos-list').innerHTML = '';
 
-            // Afficher le formulaire
             document.getElementById('page-results').classList.add('hidden');
             document.getElementById('page-form').classList.remove('hidden');
             window.scrollTo(0, 0);
