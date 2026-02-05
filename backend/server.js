@@ -64,8 +64,11 @@ app.post('/api/analyze', upload.fields([
   { name: 'documents', maxCount: 10 },
   { name: 'photos', maxCount: 20 }
 ]), async (req, res) => {
+  console.log('Requête reçue:', new Date().toISOString());
   try {
     const { annonceLink, description } = req.body;
+    console.log('Description length:', description?.length || 0);
+    console.log('Annonce link:', annonceLink || 'none');
     const documents = req.files?.documents || [];
     const photos = req.files?.photos || [];
 
@@ -166,7 +169,11 @@ app.post('/api/analyze', upload.fields([
     res.json(analysisResult);
 
   } catch (error) {
-    console.error('Erreur:', error);
+    console.error('Erreur complète:', error.message);
+    console.error('Stack:', error.stack);
+    if (error.response) {
+      console.error('Response:', error.response);
+    }
     res.status(500).json({
       erreur: "Une erreur s'est produite lors de l'analyse. Veuillez réessayer."
     });
