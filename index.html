@@ -571,6 +571,84 @@
             line-height: 1.6;
         }
 
+        /* ─── Scraping Warning ─── */
+        .scraping-warning {
+            background: var(--color-warning-bg);
+            border: 1px solid #f5d98c;
+            border-radius: var(--radius);
+            padding: 16px 20px;
+            margin-bottom: 24px;
+            font-size: 0.88rem;
+            color: var(--color-warning);
+            line-height: 1.6;
+        }
+
+        /* ─── Scraping Fallback ─── */
+        .scraping-fallback {
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg);
+            padding: 40px 36px;
+            text-align: center;
+            box-shadow: var(--shadow-card);
+        }
+
+        .scraping-fallback-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--color-warning-bg);
+            color: var(--color-warning);
+            font-size: 1.4rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            border: 2px solid #f5d98c;
+        }
+
+        .scraping-fallback h2 {
+            font-size: 1.15rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: var(--color-text);
+        }
+
+        .scraping-fallback > p {
+            font-size: 0.93rem;
+            color: var(--color-text-secondary);
+            margin-bottom: 24px;
+        }
+
+        .scraping-fallback-steps {
+            background: var(--color-neutral-bg);
+            border: 1px solid var(--color-border-light);
+            border-radius: var(--radius);
+            padding: 20px 24px;
+            text-align: left;
+            margin-bottom: 28px;
+        }
+
+        .scraping-fallback-steps p {
+            font-size: 0.88rem;
+            margin-bottom: 12px;
+            color: var(--color-text);
+        }
+
+        .scraping-fallback-steps ol {
+            margin: 0;
+            padding-left: 20px;
+            font-size: 0.88rem;
+            color: var(--color-text-secondary);
+            line-height: 1.8;
+        }
+
+        .scraping-fallback-steps a {
+            color: var(--color-accent);
+            word-break: break-all;
+        }
+
         /* ─── Hidden Utility ─── */
         .hidden {
             display: none !important;
@@ -830,7 +908,9 @@ Vous n'avez pas besoin de trier ou reformuler."></textarea>
 
                 document.getElementById('page-loading').classList.add('hidden');
 
-                if (result.erreur) {
+                if (result.scrapingEchoue && result.erreur) {
+                    showScrapingFallback(result.erreur, annonceLink);
+                } else if (result.erreur) {
                     showErrorMessage(result.erreur);
                 } else {
                     showResults(result);
@@ -848,6 +928,36 @@ Vous n'avez pas besoin de trier ou reformuler."></textarea>
             }
         }
 
+        function showScrapingFallback(message, link) {
+            const content = document.getElementById('results-content');
+            content.innerHTML = `
+                <div class="scraping-fallback">
+                    <div class="scraping-fallback-icon">!</div>
+                    <h2>Contenu de l'annonce inaccessible</h2>
+                    <p>Le site <strong>${new URL(link).hostname}</strong> bloque la lecture automatique du contenu.</p>
+                    <div class="scraping-fallback-steps">
+                        <p><strong>Pour lancer l'analyse, suivez ces étapes :</strong></p>
+                        <ol>
+                            <li>Ouvrez l'annonce dans votre navigateur : <a href="${link}" target="_blank" rel="noopener">${link.length > 60 ? link.substring(0, 60) + '...' : link}</a></li>
+                            <li>Sélectionnez et copiez tout le texte de l'annonce (titre, prix, description, caractéristiques)</li>
+                            <li>Revenez ici et collez-le dans le champ <strong>« Description et échanges »</strong></li>
+                        </ol>
+                    </div>
+                    <button class="btn-primary" onclick="returnToFormWithLink('${link.replace(/'/g, "\\'")}')">Revenir au formulaire</button>
+                </div>
+            `;
+        }
+
+        function returnToFormWithLink(link) {
+            document.getElementById('page-results').classList.add('hidden');
+            document.getElementById('page-form').classList.remove('hidden');
+            // Garder le lien pré-rempli
+            document.getElementById('annonce-link').value = link;
+            // Focus sur le champ description
+            document.getElementById('description').focus();
+            document.getElementById('description').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
         function showErrorMessage(message) {
             const content = document.getElementById('results-content');
             content.innerHTML = `
@@ -860,6 +970,15 @@ Vous n'avez pas besoin de trier ou reformuler."></textarea>
         function showResults(data) {
             const content = document.getElementById('results-content');
             let html = '';
+
+            // Avertissement si le scraping a échoué mais l'analyse a quand même fonctionné
+            if (data.scrapingEchoue) {
+                html += `
+                    <div class="scraping-warning">
+                        Le contenu de l'annonce n'a pas pu être récupéré automatiquement. L'analyse se base uniquement sur les autres éléments fournis. Pour une analyse plus complète, copiez-collez le texte de l'annonce dans le champ description.
+                    </div>
+                `;
+            }
 
             // 0. Récapitulatif véhicule
             if (data.vehicule) {

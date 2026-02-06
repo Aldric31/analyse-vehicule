@@ -278,9 +278,22 @@ app.post('/api/analyze', upload.fields([
 
     // Scraping du contenu de l'annonce si un lien est fourni
     let annonceContent = null;
+    let scrapingEchoue = false;
     if (annonceLink && annonceLink.trim().length > 10) {
       console.log('Scraping annonce avec Puppeteer:', annonceLink);
       annonceContent = await fetchAnnonceContent(annonceLink.trim());
+      if (!annonceContent) {
+        scrapingEchoue = true;
+        console.log('Scraping échoué pour:', annonceLink);
+      }
+    }
+
+    // Si le scraping a échoué et qu'il n'y a pas assez de données complémentaires, demander à l'utilisateur
+    if (scrapingEchoue && !hasDescription && !hasDocuments && !hasPhotos) {
+      return res.json({
+        scrapingEchoue: true,
+        erreur: "Le contenu de l'annonce n'a pas pu être récupéré automatiquement (le site est protégé contre la lecture automatique). Veuillez copier-coller le texte de l'annonce dans le champ « Description et échanges » puis relancer l'analyse."
+      });
     }
 
     // Construction du message utilisateur
@@ -290,7 +303,7 @@ app.post('/api/analyze', upload.fields([
       if (annonceContent) {
         userMessage += `CONTENU DE L'ANNONCE (récupéré depuis ${annonceLink}) :\n${annonceContent}\n\n`;
       } else {
-        userMessage += `LIEN DE L'ANNONCE (contenu non récupérable) : ${annonceLink}\n\n`;
+        userMessage += `LIEN DE L'ANNONCE (contenu non récupérable automatiquement) : ${annonceLink}\n\n`;
       }
     }
 
@@ -369,6 +382,9 @@ app.post('/api/analyze', upload.fields([
       }
     }
 
+    if (scrapingEchoue) {
+      analysisResult.scrapingEchoue = true;
+    }
     res.json(analysisResult);
 
   } catch (error) {
