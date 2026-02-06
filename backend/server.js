@@ -237,6 +237,14 @@ async function fetchAnnonceContent(url) {
       return null;
     }
 
+    // Détecter si le contenu est en fait une page Cloudflare / anti-bot
+    const cfSignatures = ['Just a moment', 'Un instant', 'Einen Moment', 'not a robot', 'Ensuring your connection', 'Enable JavaScript', 'Checking your browser', 'En attente de réponse'];
+    const isCfContent = cfSignatures.some(sig => content.includes(sig));
+    if (isCfContent) {
+      console.log('Contenu détecté comme page Cloudflare, considéré comme échec');
+      return null;
+    }
+
     console.log(`Contenu annonce extrait: ${content.length} caractères`);
     console.log(`Aperçu: ${content.substring(0, 200)}`);
     return content;
