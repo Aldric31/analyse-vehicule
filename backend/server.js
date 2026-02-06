@@ -2,7 +2,10 @@ const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const Anthropic = require('@anthropic-ai/sdk');
-const cheerio = require('cheerio');
+const puppeteer = require('puppeteer-extra');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+
+puppeteer.use(StealthPlugin());
 
 const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -16,6 +19,42 @@ app.use(express.json({ limit: '10mb' }));
 
 // Client Anthropic (utilise ANTHROPIC_API_KEY depuis les variables d'environnement)
 const anthropic = new Anthropic();
+
+// --- Browser singleton ---
+let browser = null;
+
+async function getBrowser() {
+  if (browser && browser.connected) {
+    return browser;
+  }
+
+  console.log('Lancement du navigateur Chrome...');
+  browser = await puppeteer.launch({
+    headless: 'new',
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/google-chrome-stable',
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--single-process',
+      '--disable-gpu',
+      '--disable-extensions',
+      '--disable-background-networking',
+      '--disable-default-apps',
+      '--disable-sync',
+      '--no-first-run',
+      '--no-zygote',
+    ],
+  });
+
+  browser.on('disconnected', () => {
+    console.log('Browser déconnecté, sera relancé à la prochaine requête');
+    browser = null;
+  });
+
+  console.log('Chrome lancé avec succès');
+  return browser;
+}
 
 // Prompt système pour l'analyse
 const SYSTEM_PROMPT = `Tu es un assistant spécialisé dans l'analyse factuelle de dossiers d'achat de véhicules de passion ou de collection.
@@ -68,95 +107,112 @@ Si les informations fournies sont insuffisantes pour produire une analyse utile,
 
 IMPORTANT : Réponds UNIQUEMENT avec le JSON, sans texte avant ou après.`;
 
-// Fonction de scraping du contenu d'une annonce
+// Fonction de scraping du contenu d'une annonce avec Puppeteer
 async function fetchAnnonceContent(url) {
+  let page = null;
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
+    const b = await getBrowser();
+    page = await b.newPage();
 
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8',
+    // Bloquer images, fonts, CSS pour accélérer le chargement
+    await page.setRequestInterception(true);
+    page.on('request', (req) => {
+      const type = req.resourceType();
+      if (['image', 'font', 'stylesheet', 'media'].includes(type)) {
+        req.abort();
+      } else {
+        req.continue();
       }
     });
-    clearTimeout(timeout);
 
-    if (!response.ok) {
-      console.log(`Fetch annonce failed: HTTP ${response.status}`);
-      return null;
+    // User-agent réaliste
+    await page.setUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    );
+
+    // Navigation
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
+
+    // Attendre que le contenu JS soit rendu (max 5s)
+    await page.waitForSelector('body', { timeout: 5000 }).catch(() => {});
+
+    // Extraire le contenu depuis le DOM réel
+    const result = await page.evaluate(() => {
+      // Supprimer les éléments parasites
+      const selectorsToRemove = [
+        'script', 'style', 'nav', 'footer', 'header', 'iframe', 'noscript', 'svg',
+        '[role="navigation"]', '[role="banner"]', '[class*="cookie"]', '[class*="Cookie"]',
+        '[class*="consent"]', '[class*="Consent"]', '[class*="popup"]', '[class*="Popup"]',
+        '[class*="modal"]', '[class*="Modal"]', '[class*="banner"]', '[class*="Banner"]',
+      ];
+      selectorsToRemove.forEach(sel => {
+        document.querySelectorAll(sel).forEach(el => el.remove());
+      });
+
+      const parts = [];
+
+      // Titre de la page
+      const title = document.title?.trim();
+      if (title) parts.push('TITRE: ' + title);
+
+      // Meta description
+      const metaDesc = document.querySelector('meta[name="description"]')?.getAttribute('content');
+      if (metaDesc) parts.push('DESCRIPTION META: ' + metaDesc.trim());
+
+      // Prix
+      document.querySelectorAll('[class*="price"], [class*="prix"], [class*="Price"], [data-qa="adview_price"]').forEach(el => {
+        const text = el.textContent?.trim();
+        if (text && text.length < 100) parts.push('PRIX: ' + text);
+      });
+
+      // Titre de l'annonce
+      document.querySelectorAll('h1, [class*="title"], [class*="titre"], [data-qa="adview_title"]').forEach(el => {
+        const text = el.textContent?.trim();
+        if (text && text.length > 3 && text.length < 200) parts.push('TITRE ANNONCE: ' + text);
+      });
+
+      // Description
+      document.querySelectorAll('[class*="description"], [class*="Description"], [data-qa="adview_description"], [class*="content"], [class*="body"]').forEach(el => {
+        const text = el.textContent?.trim();
+        if (text && text.length > 20) parts.push('DESCRIPTION: ' + text);
+      });
+
+      // Caractéristiques / spécifications
+      document.querySelectorAll('[class*="criteria"], [class*="feature"], [class*="detail"], [class*="specification"], [class*="attribute"], dl, table').forEach(el => {
+        const text = el.textContent?.trim().replace(/\s+/g, ' ');
+        if (text && text.length > 10 && text.length < 1000) parts.push('CARACTÉRISTIQUES: ' + text);
+      });
+
+      // Fallback: si peu de contenu extrait, prendre le body
+      if (parts.length <= 2) {
+        const bodyText = document.body?.textContent?.replace(/\s+/g, ' ')?.trim();
+        if (bodyText) parts.push('CONTENU PAGE: ' + bodyText);
+      }
+
+      return parts.join('\n\n');
+    });
+
+    // Limiter à 5000 caractères
+    let content = result;
+    if (content.length > 5000) {
+      content = content.substring(0, 5000) + '\n[... contenu tronqué]';
     }
 
-    const html = await response.text();
-    const $ = cheerio.load(html);
-
-    // Supprimer les éléments non pertinents
-    $('script, style, nav, footer, header, iframe, noscript, svg, [role="navigation"], [role="banner"]').remove();
-
-    // Extraire les éléments pertinents d'une annonce
-    const parts = [];
-
-    // Titre de la page
-    const title = $('title').text().trim();
-    if (title) parts.push(`TITRE: ${title}`);
-
-    // Meta description
-    const metaDesc = $('meta[name="description"]').attr('content');
-    if (metaDesc) parts.push(`DESCRIPTION META: ${metaDesc.trim()}`);
-
-    // Chercher le prix (patterns courants sur les sites d'annonces)
-    $('[class*="price"], [class*="prix"], [data-qa="adview_price"], [class*="Price"]').each((_, el) => {
-      const text = $(el).text().trim();
-      if (text && text.length < 100) parts.push(`PRIX: ${text}`);
-    });
-
-    // Chercher le titre de l'annonce
-    $('h1, [class*="title"], [class*="titre"], [data-qa="adview_title"]').each((_, el) => {
-      const text = $(el).text().trim();
-      if (text && text.length > 3 && text.length < 200) parts.push(`TITRE ANNONCE: ${text}`);
-    });
-
-    // Chercher la description de l'annonce
-    $('[class*="description"], [class*="Description"], [data-qa="adview_description"], [class*="content"], [class*="body"]').each((_, el) => {
-      const text = $(el).text().trim();
-      if (text && text.length > 20) parts.push(`DESCRIPTION: ${text}`);
-    });
-
-    // Chercher les caractéristiques / critères
-    $('[class*="criteria"], [class*="caractéristique"], [class*="feature"], [class*="detail"], [class*="specification"], [class*="attribute"], dl, table').each((_, el) => {
-      const text = $(el).text().trim().replace(/\s+/g, ' ');
-      if (text && text.length > 10 && text.length < 1000) parts.push(`CARACTÉRISTIQUES: ${text}`);
-    });
-
-    // Si on n'a pas trouvé grand-chose avec les sélecteurs spécifiques, fallback sur le body
-    if (parts.length <= 2) {
-      const bodyText = $('body').text().replace(/\s+/g, ' ').trim();
-      if (bodyText) parts.push(`CONTENU PAGE: ${bodyText}`);
-    }
-
-    // Assembler et limiter à ~5000 caractères
-    let result = parts.join('\n\n');
-    if (result.length > 5000) {
-      result = result.substring(0, 5000) + '\n[... contenu tronqué]';
-    }
-
-    if (result.trim().length < 50) {
+    if (content.trim().length < 50) {
       console.log('Contenu extrait trop court, considéré comme échec');
       return null;
     }
 
-    console.log(`Contenu annonce extrait: ${result.length} caractères`);
-    return result;
+    console.log(`Contenu annonce extrait: ${content.length} caractères`);
+    return content;
 
   } catch (error) {
-    if (error.name === 'AbortError') {
-      console.log('Fetch annonce timeout (10s)');
-    } else {
-      console.log(`Fetch annonce error: ${error.message}`);
-    }
+    console.log(`Erreur scraping annonce: ${error.message}`);
     return null;
+  } finally {
+    if (page) {
+      await page.close().catch(() => {});
+    }
   }
 }
 
@@ -188,7 +244,7 @@ app.post('/api/analyze', upload.fields([
     // Scraping du contenu de l'annonce si un lien est fourni
     let annonceContent = null;
     if (annonceLink && annonceLink.trim().length > 10) {
-      console.log('Fetching annonce content from:', annonceLink);
+      console.log('Scraping annonce avec Puppeteer:', annonceLink);
       annonceContent = await fetchAnnonceContent(annonceLink.trim());
     }
 
@@ -292,12 +348,39 @@ app.post('/api/analyze', upload.fields([
   }
 });
 
-// Route de santé
+// Route de santé avec statut du browser
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok' });
+  res.json({
+    status: 'ok',
+    browser: browser && browser.connected ? 'connected' : 'disconnected',
+  });
 });
 
-// Démarrage du serveur
-app.listen(PORT, () => {
+// Shutdown propre : fermer Chrome avant arrêt du container
+process.on('SIGTERM', async () => {
+  console.log('SIGTERM reçu, fermeture de Chrome...');
+  if (browser) {
+    await browser.close().catch(() => {});
+  }
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  console.log('SIGINT reçu, fermeture de Chrome...');
+  if (browser) {
+    await browser.close().catch(() => {});
+  }
+  process.exit(0);
+});
+
+// Démarrage du serveur + lancement du browser
+app.listen(PORT, async () => {
   console.log(`Serveur démarré sur le port ${PORT}`);
+  try {
+    await getBrowser();
+    console.log('Browser prêt pour le scraping');
+  } catch (err) {
+    console.error('Impossible de lancer Chrome au démarrage:', err.message);
+    console.log('Le browser sera relancé à la première requête de scraping');
+  }
 });
