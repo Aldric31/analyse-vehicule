@@ -130,11 +130,32 @@ async function fetchAnnonceContent(url) {
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     );
 
-    // Navigation
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
+    // Navigation — networkidle2 attend que le JS finisse de rendre
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: 20000 });
 
-    // Attendre que le contenu JS soit rendu (max 5s)
-    await page.waitForSelector('body', { timeout: 5000 }).catch(() => {});
+    // Accepter les popups de cookies (patterns courants)
+    const cookieSelectors = [
+      '[id*="cookie"] button', '[class*="cookie"] button',
+      '[id*="consent"] button', '[class*="consent"] button',
+      '[id*="onetrust"] button', '#onetrust-accept-btn-handler',
+      'button[id*="accept"]', 'button[class*="accept"]',
+      'button[id*="agree"]', 'button[class*="agree"]',
+      '.cmp-accept', '[data-testid="accept-all"]',
+    ];
+    for (const sel of cookieSelectors) {
+      try {
+        const btn = await page.$(sel);
+        if (btn) {
+          await btn.click();
+          console.log(`Cookie popup fermé via: ${sel}`);
+          await new Promise(r => setTimeout(r, 1000));
+          break;
+        }
+      } catch {}
+    }
+
+    // Attendre que le vrai contenu soit rendu (h1, prix, ou description)
+    await page.waitForSelector('h1, [class*="price"], [class*="Price"], [class*="detail"]', { timeout: 8000 }).catch(() => {});
 
     // Extraire le contenu depuis le DOM réel
     const result = await page.evaluate(() => {
@@ -144,6 +165,7 @@ async function fetchAnnonceContent(url) {
         '[role="navigation"]', '[role="banner"]', '[class*="cookie"]', '[class*="Cookie"]',
         '[class*="consent"]', '[class*="Consent"]', '[class*="popup"]', '[class*="Popup"]',
         '[class*="modal"]', '[class*="Modal"]', '[class*="banner"]', '[class*="Banner"]',
+        '[class*="overlay"]', '[class*="Overlay"]',
       ];
       selectorsToRemove.forEach(sel => {
         document.querySelectorAll(sel).forEach(el => el.remove());
@@ -204,6 +226,7 @@ async function fetchAnnonceContent(url) {
     }
 
     console.log(`Contenu annonce extrait: ${content.length} caractères`);
+    console.log(`Aperçu: ${content.substring(0, 200)}`);
     return content;
 
   } catch (error) {
