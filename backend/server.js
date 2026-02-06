@@ -33,6 +33,12 @@ RÈGLES STRICTES :
 
 FORMAT DE RÉPONSE (respecte STRICTEMENT cette structure JSON) :
 {
+  "vehicule": {
+    "modele": "Marque et modèle du véhicule (ou null si non identifiable)",
+    "annee": "Année du véhicule (ou null si non identifiable)",
+    "kilometrage": "Kilométrage indiqué (ou null si non mentionné)",
+    "prix": "Prix demandé (ou null si non mentionné)"
+  },
   "elementsCoherents": [
     "Description factuelle d'un élément cohérent",
     "..."
@@ -51,6 +57,8 @@ FORMAT DE RÉPONSE (respecte STRICTEMENT cette structure JSON) :
   ],
   "lectureGlobale": "2-3 phrases maximum résumant la lecture de cohérence, SANS recommandation d'achat."
 }
+
+Pour le champ "vehicule", extrais les informations directement depuis les éléments fournis (annonce, description, échanges, documents, photos). Si une information n'est pas trouvable, mets null.
 
 Si les informations fournies sont insuffisantes pour produire une analyse utile, réponds :
 {

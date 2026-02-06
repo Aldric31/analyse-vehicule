@@ -9,25 +9,25 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --color-bg: #f4f5f7;
-            --color-surface: #ffffff;
-            --color-border: #e2e4e9;
-            --color-border-light: #edeef1;
-            --color-text: #1e2a3a;
-            --color-text-secondary: #526070;
-            --color-text-muted: #8c95a1;
-            --color-primary: #334155;
-            --color-primary-hover: #1e293b;
-            --color-accent: #475569;
-            --color-accent-light: #64748b;
+            --color-bg: #F7F8FA;
+            --color-surface: #FFFFFF;
+            --color-border: #E5E7EB;
+            --color-border-light: #F0F1F3;
+            --color-text: #111827;
+            --color-text-secondary: #374151;
+            --color-text-muted: #6b7280;
+            --color-primary: #1F4FE5;
+            --color-primary-hover: #1a43c2;
+            --color-accent: #1F4FE5;
+            --color-accent-light: #1F4FE5;
             --color-warning: #92400e;
             --color-warning-bg: #fffbeb;
-            --color-info: #1e3a5f;
-            --color-info-bg: #f0f4f9;
-            --color-info-border: #c8d6e5;
+            --color-info: #1F4FE5;
+            --color-info-bg: #EEF4FF;
+            --color-info-border: #c7d6f5;
             --color-success: #1a5632;
             --color-success-bg: #f0fdf4;
-            --color-neutral-bg: #f8f9fb;
+            --color-neutral-bg: #F7F8FA;
             --shadow-card: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02);
             --shadow-card-hover: 0 2px 6px rgba(0,0,0,0.06);
             --radius: 8px;
@@ -54,7 +54,7 @@
         .container {
             max-width: var(--max-width);
             margin: 0 auto;
-            padding: 56px 32px 96px;
+            padding: 64px 32px 96px;
         }
 
         @media (max-width: 600px) {
@@ -64,38 +64,35 @@
         }
 
         /* ─── Header ─── */
-        .header {
+        .hero {
+            max-width: 720px;
+            margin: 0 auto 72px;
             text-align: center;
-            margin-bottom: 56px;
-            padding-bottom: 40px;
-            border-bottom: 1px solid var(--color-border-light);
         }
 
-        .header-label {
-            display: inline-block;
-            font-size: 0.75rem;
-            font-weight: 600;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            color: var(--color-accent-light);
-            margin-bottom: 20px;
-        }
-
-        .header h1 {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--color-text);
+        .hero-eyebrow {
+            display: block;
+            font-size: 12px;
+            letter-spacing: 0.12em;
+            color: #6b7280;
             margin-bottom: 16px;
-            letter-spacing: -0.025em;
-            line-height: 1.25;
+            text-transform: uppercase;
         }
 
-        .header .subtitle {
-            font-size: 1rem;
-            color: var(--color-text-secondary);
-            max-width: 600px;
-            margin: 0 auto 32px;
-            line-height: 1.7;
+        .hero h1 {
+            font-size: 34px;
+            line-height: 1.25;
+            font-weight: 600;
+            color: #111827;
+            margin-bottom: 24px;
+        }
+
+        .hero-subtitle {
+            font-size: 18px;
+            line-height: 1.6;
+            color: #374151;
+            max-width: 620px;
+            margin: 0 auto;
         }
 
         .btn-primary {
@@ -115,7 +112,7 @@
 
         .btn-primary:hover {
             background: var(--color-primary-hover);
-            box-shadow: 0 2px 8px rgba(30,41,59,0.15);
+            box-shadow: 0 2px 8px rgba(31,79,229,0.2);
         }
 
         .btn-primary:disabled {
@@ -129,8 +126,8 @@
             background: var(--color-surface);
             border: 1px solid var(--color-border);
             border-radius: var(--radius-lg);
-            padding: 28px 32px;
-            margin-bottom: 20px;
+            padding: 32px 36px;
+            margin-bottom: 28px;
             box-shadow: var(--shadow-card);
         }
 
@@ -198,11 +195,11 @@
         }
 
         .key-message {
-            background: var(--color-neutral-bg);
+            background: var(--color-info-bg);
             border-left: 3px solid var(--color-accent);
             border-radius: 0 var(--radius) var(--radius) 0;
-            padding: 16px 20px;
-            margin-top: 24px;
+            padding: 18px 22px;
+            margin-top: 28px;
             font-size: 0.88rem;
             color: var(--color-text-secondary);
             line-height: 1.65;
@@ -265,7 +262,7 @@
         .form-input:focus {
             outline: none;
             border-color: var(--color-accent);
-            box-shadow: 0 0 0 3px rgba(71,85,105,0.08);
+            box-shadow: 0 0 0 3px rgba(31,79,229,0.1);
         }
 
         textarea.form-input {
@@ -348,8 +345,8 @@
             background: var(--color-info-bg);
             border: 1px solid var(--color-info-border);
             border-radius: var(--radius);
-            padding: 16px 20px;
-            margin-bottom: 24px;
+            padding: 18px 22px;
+            margin-bottom: 32px;
             font-size: 0.88rem;
             color: var(--color-info);
             line-height: 1.6;
@@ -358,13 +355,13 @@
         /* ─── Submit ─── */
         .submit-section {
             text-align: center;
-            padding-top: 12px;
+            padding-top: 20px;
         }
 
         /* ─── Results Page ─── */
         .results-header {
-            margin-bottom: 36px;
-            padding-bottom: 28px;
+            margin-bottom: 44px;
+            padding-bottom: 32px;
             border-bottom: 1px solid var(--color-border-light);
         }
 
@@ -385,8 +382,8 @@
             background: var(--color-surface);
             border: 1px solid var(--color-border);
             border-radius: var(--radius-lg);
-            padding: 24px 28px;
-            margin-bottom: 16px;
+            padding: 28px 32px;
+            margin-bottom: 20px;
             box-shadow: var(--shadow-card);
         }
 
@@ -453,15 +450,72 @@
         }
 
         .result-section.questions li {
-            border-left-color: #7cb8f0;
+            border-left-color: #93b4f5;
+        }
+
+        /* ─── Vehicle Recap ─── */
+        .vehicle-recap {
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg);
+            padding: 28px 32px;
+            margin-bottom: 28px;
+            box-shadow: var(--shadow-card);
+        }
+
+        .vehicle-recap h2 {
+            font-size: 1.05rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            letter-spacing: -0.01em;
+            color: var(--color-text);
+        }
+
+        .vehicle-recap-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px 32px;
+        }
+
+        @media (max-width: 600px) {
+            .vehicle-recap-grid {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+        }
+
+        .vehicle-recap-item {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .vehicle-recap-label {
+            font-size: 0.78rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--color-text-muted);
+        }
+
+        .vehicle-recap-value {
+            font-size: 1rem;
+            font-weight: 500;
+            color: var(--color-text);
+        }
+
+        .vehicle-recap-value.empty {
+            color: var(--color-text-muted);
+            font-weight: 400;
+            font-style: italic;
         }
 
         .global-reading {
-            background: var(--color-neutral-bg);
-            border: 1px solid var(--color-border);
+            background: var(--color-info-bg);
+            border: 1px solid var(--color-info-border);
             border-radius: var(--radius-lg);
-            padding: 24px 28px;
-            margin-bottom: 28px;
+            padding: 28px 32px;
+            margin-bottom: 36px;
         }
 
         .global-reading h2 {
@@ -481,15 +535,15 @@
             font-size: 0.78rem;
             color: var(--color-text-muted);
             text-align: center;
-            padding: 28px 24px;
+            padding: 32px 24px;
             border-top: 1px solid var(--color-border-light);
-            margin-top: 40px;
+            margin-top: 48px;
             line-height: 1.65;
         }
 
         .back-link {
             display: inline-block;
-            margin-top: 28px;
+            margin-top: 36px;
             color: var(--color-accent);
             text-decoration: none;
             font-size: 0.9rem;
@@ -498,7 +552,7 @@
         }
 
         .back-link:hover {
-            color: var(--color-primary);
+            color: var(--color-primary-hover);
             text-decoration: underline;
         }
 
@@ -557,14 +611,19 @@
 <body>
     <!-- Page principale (formulaire) -->
     <div id="page-form" class="container">
-        <header class="header">
-            <span class="header-label">Analyse factuelle</span>
-            <h1>Clarifier ce que vous avez avant d'aller plus loin</h1>
-            <p class="subtitle">
-                Lecture factuelle des informations reçues pour un véhicule de passion ou de collection,
-                afin d'identifier incohérences, zones d'ombre et points à vérifier — avant de vous déplacer.
+        <header class="hero">
+            <span class="hero-eyebrow">ANALYSE FACTUELLE</span>
+
+            <h1>
+                Quand les informations s'accumulent,<br>
+                mais que le doute persiste
+            </h1>
+
+            <p class="hero-subtitle">
+                Cette analyse vous aide à faire la part des choses :
+                ce qui est cohérent, ce qui ne l'est pas,
+                et ce qui reste flou.
             </p>
-            <button class="btn-primary" onclick="scrollToForm()">Analyser mon dossier</button>
         </header>
 
         <!-- Bloc explicatif -->
@@ -801,6 +860,34 @@ Vous n'avez pas besoin de trier ou reformuler."></textarea>
         function showResults(data) {
             const content = document.getElementById('results-content');
             let html = '';
+
+            // 0. Récapitulatif véhicule
+            if (data.vehicule) {
+                const v = data.vehicule;
+                html += `
+                    <div class="vehicle-recap">
+                        <h2>Récapitulatif du véhicule</h2>
+                        <div class="vehicle-recap-grid">
+                            <div class="vehicle-recap-item">
+                                <span class="vehicle-recap-label">Modèle</span>
+                                <span class="vehicle-recap-value${v.modele ? '' : ' empty'}">${v.modele || 'Non renseigné'}</span>
+                            </div>
+                            <div class="vehicle-recap-item">
+                                <span class="vehicle-recap-label">Année</span>
+                                <span class="vehicle-recap-value${v.annee ? '' : ' empty'}">${v.annee || 'Non renseignée'}</span>
+                            </div>
+                            <div class="vehicle-recap-item">
+                                <span class="vehicle-recap-label">Kilométrage</span>
+                                <span class="vehicle-recap-value${v.kilometrage ? '' : ' empty'}">${v.kilometrage || 'Non renseigné'}</span>
+                            </div>
+                            <div class="vehicle-recap-item">
+                                <span class="vehicle-recap-label">Prix</span>
+                                <span class="vehicle-recap-value${v.prix ? '' : ' empty'}">${v.prix || 'Non renseigné'}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
 
             // 1. Éléments cohérents
             if (data.elementsCoherents && data.elementsCoherents.length > 0) {
