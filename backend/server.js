@@ -114,39 +114,35 @@ async function fetchAnnonceContent(url) {
     const b = await getBrowser();
     page = await b.newPage();
 
-    // Bloquer images, fonts, CSS pour accélérer le chargement
-    await page.setRequestInterception(true);
-    page.on('request', (req) => {
-      const type = req.resourceType();
-      if (['image', 'font', 'stylesheet', 'media'].includes(type)) {
-        req.abort();
-      } else {
-        req.continue();
-      }
+    // Viewport réaliste (évite le fingerprint headless)
+    await page.setViewport({ width: 1920, height: 1080 });
+
+    // Headers réalistes
+    await page.setExtraHTTPHeaders({
+      'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     });
 
-    // User-agent réaliste
-    await page.setUserAgent(
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-    );
-
-    // Navigation
-    await page.goto(url, { waitUntil: 'networkidle2', timeout: 25000 });
+    // Navigation — PAS de request interception (Cloudflare la détecte)
+    console.log('Navigation vers:', url);
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
 
     // Détecter et attendre la résolution du challenge Cloudflare
-    const pageTitle = await page.title();
+    let pageTitle = await page.title();
+    console.log('Titre initial:', pageTitle);
     if (pageTitle.includes('Just a moment') || pageTitle.includes('Attention Required') || pageTitle.includes('Checking')) {
       console.log('Challenge Cloudflare détecté, attente de résolution...');
       try {
         await page.waitForFunction(
-          () => !document.title.includes('Just a moment') && !document.title.includes('Checking'),
-          { timeout: 15000 }
+          () => !document.title.includes('Just a moment') && !document.title.includes('Checking') && !document.title.includes('Attention'),
+          { timeout: 20000 }
         );
         // Attendre que la vraie page se charge après le redirect
         await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 15000 }).catch(() => {});
-        console.log('Challenge Cloudflare résolu, nouveau titre:', await page.title());
+        pageTitle = await page.title();
+        console.log('Challenge Cloudflare résolu, nouveau titre:', pageTitle);
       } catch {
-        console.log('Challenge Cloudflare non résolu après 15s');
+        console.log('Challenge Cloudflare non résolu après 20s');
       }
     }
 
