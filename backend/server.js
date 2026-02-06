@@ -30,20 +30,16 @@ async function getBrowser() {
 
   console.log('Lancement du navigateur Chrome...');
   browser = await puppeteer.launch({
-    headless: 'new',
+    headless: true,
     executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/google-chrome-stable',
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
-      '--single-process',
       '--disable-gpu',
-      '--disable-extensions',
-      '--disable-background-networking',
-      '--disable-default-apps',
-      '--disable-sync',
       '--no-first-run',
-      '--no-zygote',
+      '--disable-blink-features=AutomationControlled',
+      '--window-size=1920,1080',
     ],
   });
 
@@ -130,12 +126,15 @@ async function fetchAnnonceContent(url) {
     // Détecter et attendre la résolution du challenge Cloudflare
     let pageTitle = await page.title();
     console.log('Titre initial:', pageTitle);
-    if (pageTitle.includes('Just a moment') || pageTitle.includes('Attention Required') || pageTitle.includes('Checking')) {
+    const cfKeywords = ['Just a moment', 'Un instant', 'Einen Moment', 'Attention Required', 'Checking', 'robot'];
+    const isCfChallenge = cfKeywords.some(kw => pageTitle.includes(kw));
+    if (isCfChallenge) {
       console.log('Challenge Cloudflare détecté, attente de résolution...');
       try {
         await page.waitForFunction(
-          () => !document.title.includes('Just a moment') && !document.title.includes('Checking') && !document.title.includes('Attention'),
-          { timeout: 20000 }
+          (keywords) => !keywords.some(kw => document.title.includes(kw)),
+          { timeout: 25000 },
+          cfKeywords
         );
         // Attendre que la vraie page se charge après le redirect
         await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 15000 }).catch(() => {});
