@@ -130,8 +130,25 @@ async function fetchAnnonceContent(url) {
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     );
 
-    // Navigation — networkidle2 attend que le JS finisse de rendre
-    await page.goto(url, { waitUntil: 'networkidle2', timeout: 20000 });
+    // Navigation
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: 25000 });
+
+    // Détecter et attendre la résolution du challenge Cloudflare
+    const pageTitle = await page.title();
+    if (pageTitle.includes('Just a moment') || pageTitle.includes('Attention Required') || pageTitle.includes('Checking')) {
+      console.log('Challenge Cloudflare détecté, attente de résolution...');
+      try {
+        await page.waitForFunction(
+          () => !document.title.includes('Just a moment') && !document.title.includes('Checking'),
+          { timeout: 15000 }
+        );
+        // Attendre que la vraie page se charge après le redirect
+        await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 15000 }).catch(() => {});
+        console.log('Challenge Cloudflare résolu, nouveau titre:', await page.title());
+      } catch {
+        console.log('Challenge Cloudflare non résolu après 15s');
+      }
+    }
 
     // Accepter les popups de cookies (patterns courants)
     const cookieSelectors = [
