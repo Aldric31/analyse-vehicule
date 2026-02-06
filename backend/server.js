@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const Anthropic = require('@anthropic-ai/sdk');
+const cheerio = require('cheerio');
 
 const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -67,6 +68,98 @@ Si les informations fournies sont insuffisantes pour produire une analyse utile,
 
 IMPORTANT : Réponds UNIQUEMENT avec le JSON, sans texte avant ou après.`;
 
+// Fonction de scraping du contenu d'une annonce
+async function fetchAnnonceContent(url) {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8',
+      }
+    });
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      console.log(`Fetch annonce failed: HTTP ${response.status}`);
+      return null;
+    }
+
+    const html = await response.text();
+    const $ = cheerio.load(html);
+
+    // Supprimer les éléments non pertinents
+    $('script, style, nav, footer, header, iframe, noscript, svg, [role="navigation"], [role="banner"]').remove();
+
+    // Extraire les éléments pertinents d'une annonce
+    const parts = [];
+
+    // Titre de la page
+    const title = $('title').text().trim();
+    if (title) parts.push(`TITRE: ${title}`);
+
+    // Meta description
+    const metaDesc = $('meta[name="description"]').attr('content');
+    if (metaDesc) parts.push(`DESCRIPTION META: ${metaDesc.trim()}`);
+
+    // Chercher le prix (patterns courants sur les sites d'annonces)
+    $('[class*="price"], [class*="prix"], [data-qa="adview_price"], [class*="Price"]').each((_, el) => {
+      const text = $(el).text().trim();
+      if (text && text.length < 100) parts.push(`PRIX: ${text}`);
+    });
+
+    // Chercher le titre de l'annonce
+    $('h1, [class*="title"], [class*="titre"], [data-qa="adview_title"]').each((_, el) => {
+      const text = $(el).text().trim();
+      if (text && text.length > 3 && text.length < 200) parts.push(`TITRE ANNONCE: ${text}`);
+    });
+
+    // Chercher la description de l'annonce
+    $('[class*="description"], [class*="Description"], [data-qa="adview_description"], [class*="content"], [class*="body"]').each((_, el) => {
+      const text = $(el).text().trim();
+      if (text && text.length > 20) parts.push(`DESCRIPTION: ${text}`);
+    });
+
+    // Chercher les caractéristiques / critères
+    $('[class*="criteria"], [class*="caractéristique"], [class*="feature"], [class*="detail"], [class*="specification"], [class*="attribute"], dl, table').each((_, el) => {
+      const text = $(el).text().trim().replace(/\s+/g, ' ');
+      if (text && text.length > 10 && text.length < 1000) parts.push(`CARACTÉRISTIQUES: ${text}`);
+    });
+
+    // Si on n'a pas trouvé grand-chose avec les sélecteurs spécifiques, fallback sur le body
+    if (parts.length <= 2) {
+      const bodyText = $('body').text().replace(/\s+/g, ' ').trim();
+      if (bodyText) parts.push(`CONTENU PAGE: ${bodyText}`);
+    }
+
+    // Assembler et limiter à ~5000 caractères
+    let result = parts.join('\n\n');
+    if (result.length > 5000) {
+      result = result.substring(0, 5000) + '\n[... contenu tronqué]';
+    }
+
+    if (result.trim().length < 50) {
+      console.log('Contenu extrait trop court, considéré comme échec');
+      return null;
+    }
+
+    console.log(`Contenu annonce extrait: ${result.length} caractères`);
+    return result;
+
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      console.log('Fetch annonce timeout (10s)');
+    } else {
+      console.log(`Fetch annonce error: ${error.message}`);
+    }
+    return null;
+  }
+}
+
 // Route principale d'analyse
 app.post('/api/analyze', upload.fields([
   { name: 'documents', maxCount: 10 },
@@ -92,11 +185,22 @@ app.post('/api/analyze', upload.fields([
       });
     }
 
+    // Scraping du contenu de l'annonce si un lien est fourni
+    let annonceContent = null;
+    if (annonceLink && annonceLink.trim().length > 10) {
+      console.log('Fetching annonce content from:', annonceLink);
+      annonceContent = await fetchAnnonceContent(annonceLink.trim());
+    }
+
     // Construction du message utilisateur
     let userMessage = "Analyse ce dossier d'achat de véhicule :\n\n";
 
     if (annonceLink) {
-      userMessage += `LIEN DE L'ANNONCE :\n${annonceLink}\n\n`;
+      if (annonceContent) {
+        userMessage += `CONTENU DE L'ANNONCE (récupéré depuis ${annonceLink}) :\n${annonceContent}\n\n`;
+      } else {
+        userMessage += `LIEN DE L'ANNONCE (contenu non récupérable) : ${annonceLink}\n\n`;
+      }
     }
 
     if (description) {
